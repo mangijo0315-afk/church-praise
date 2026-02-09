@@ -5,27 +5,26 @@ import streamlit.components.v1 as components
 # 1. 앱 설정
 st.set_page_config(page_title="대흥교회 스마트 보드", layout="wide")
 
-# 2. 데이터 저장소 초기화
-for key, default in [
-    ('message_list', []), 
-    ('sheets', []), 
-    ('page', 0), 
-    ('permanent_storage', {}), 
-    ('temp_storage', {}),
-    ('swipe_signal', None)
-]:
+# 2. 데이터 저장소 초기화 (저장소 유실 방지)
+keys = {
+    'message_list': [], 
+    'sheets': [], 
+    'page': 0, 
+    'permanent_storage': {}, 
+    'temp_storage': {},
+}
+for key, default in keys.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
 default_btns = ["𝄇 후렴", "🌉 브릿지", "🔚 엔딩"]
 
-# 3. 페이지 이동 함수 (에러 방지 로직 포함)
+# 3. 페이지 이동 함수
 def move_page(delta):
     if st.session_state.sheets:
-        new_page = (st.session_state.page + delta) % len(st.session_state.sheets)
-        st.session_state.page = new_page
+        st.session_state.page = (st.session_state.page + delta) % len(st.session_state.sheets)
 
-# 4. 스와이프 감지 (자바스크립트 에러 방지 처리)
+# 4. 스와이프 감지 로직 (자바스크립트)
 if st.session_state.sheets:
     swipe_js = """
     <script>
@@ -35,32 +34,46 @@ if st.session_state.sheets:
     doc.addEventListener('touchend', function(e) {
         var endX = e.changedTouches[0].clientX;
         var diffX = startX - endX;
-        if (Math.abs(diffX) > 80) {
+        if (Math.abs(diffX) > 70) { // 반응 민감도 조절
             if (diffX > 0) window.parent.postMessage({type: 'streamlit:setComponentValue', value: 'next'}, '*');
             else window.parent.postMessage({type: 'streamlit:setComponentValue', value: 'prev'}, '*');
         }
     }, false);
     </script>
     """
-    swipe_detector = components.html(swipe_js, height=0)
-    
-    # 스와이프 신호 처리
-    if swipe_detector == 'next': move_page(1); st.rerun()
-    if swipe_detector == 'prev': move_page(-1); st.rerun()
+    swipe_val = components.html(swipe_js, height=0)
+    if swipe_val == 'next': move_page(1); st.rerun()
+    if swipe_val == 'prev': move_page(-1); st.rerun()
 
 # 5. 디자인 (CSS)
 st.markdown("""
     <style>
     .home-icon { position: fixed; top: 10px; right: 20px; font-size: 30px; z-index: 2000; }
-    .signal-box { background-color: #ff4b4b; color: white; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 15px; border: 4px solid white; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); }
-    .stButton>button { width: 100%; font-weight: bold; height: 60px; border-radius: 12px; }
+    .signal-box { background-color: #ff4b4b; color: white; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 15px; border: 4px solid white; }
+    .nav-btn button { height: 80px !important; font-size: 30px !important; background-color: #f0f2f6 !important; border-radius: 15px !important; border: 2px solid #ccc !important; }
+    .stButton>button { width: 100%; font-weight: bold; border-radius: 12px; }
     </style>
     <div class="home-icon">🏠</div>
 """, unsafe_allow_html=True)
 
+# 6. 사이드바 (저장소 복구)
 user_role = st.sidebar.radio("📢 역할 선택", ["인도자", "반주자/싱어"])
 
-# 6. 인도자 화면
+with st.sidebar.expander("💾 설정 저장 및 관리", expanded=True):
+    st.subheader("📂 장기 저장 목록")
+    if st.session_state.permanent_storage:
+        for song, data in st.session_state.permanent_storage.items():
+            st.info(f"📌 **{song}**\n: {', '.join(data['btns'])}")
+    else:
+        st.write("저장된 곡이 없습니다.")
+    
+    st.divider()
+    st.subheader("⏱️ 임시 작업 목록")
+    for song in st.session_state.temp_storage.keys():
+        if song not in st.session_state.permanent_storage:
+            st.caption(f"⏳ {song} (편집 중...)")
+
+# 7. 메인 화면 로직
 if user_role == "인도자":
     st.title("🎮 인도자 센터")
     current_msg = st.session_state.message_list[-1] if st.session_state.message_list else "대기 중"
@@ -70,10 +83,16 @@ if user_role == "인도자":
         cur_file = st.session_state.sheets[st.session_state.page]
         song_name = cur_file.name.split('.')[0]
         
+        # [인도자 이동 버튼 부활]
+        st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        c1.button("◀ PREV", key="ind_prev", on_click=move_page, args=(-1,))
+        c2.button("NEXT ▶", key="ind_next", on_click=move_page, args=(1,))
+        st.markdown('</div>', unsafe_allow_html=True)
+
         col_left, col_right = st.columns([2.5, 1.2])
         with col_left:
-            st.subheader(f"📄 {song_name} ({st.session_state.page + 1}/{len(st.session_state.sheets)})")
-            st.caption("👈 악보를 좌우로 밀어서 넘기세요")
+            st.subheader(f"📄 {song_name}")
             st.image(cur_file, use_container_width=True)
 
         with col_right:
@@ -89,8 +108,8 @@ if user_role == "인도자":
 
             st.divider()
             st.subheader("📢 신호 전송")
-            saved_custom = st.session_state.permanent_storage.get(song_name, {}).get("btns", st.session_state.temp_storage.get(song_name, []))
-            for b in (default_btns + saved_custom):
+            custom = st.session_state.permanent_storage.get(song_name, {}).get("btns", st.session_state.temp_storage.get(song_name, []))
+            for b in (default_btns + custom):
                 if st.button(f"📍 {b}", key=f"send_{b}"):
                     st.session_state.message_list.append(f"📍 {b} !!"); st.rerun()
             
@@ -103,15 +122,21 @@ if user_role == "인도자":
         uploaded = st.file_uploader("악보 업로드", accept_multiple_files=True)
         if uploaded: st.session_state.sheets = uploaded; st.rerun()
 
-# 7. 반주자 화면 (에러 방지형)
+# 8. 반주자 화면
 else:
     st.title("🎹 반주자/싱어 화면")
     if st.session_state.sheets:
-        current_msg = st.session_state.message_list[-1] if st.session_state.message_list else "연주 준비 중..."
+        current_msg = st.session_state.message_list[-1] if st.session_state.message_list else "준비 중"
         st.markdown(f'<div class="signal-box"><h1 style="font-size:60px; margin:0;">{current_msg}</h1></div>', unsafe_allow_html=True)
         
-        # 반주자도 스와이프 가능
+        # [반주자 이동 버튼 부활]
+        st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
+        bc1, bc2 = st.columns(2)
+        bc1.button("◀ PREV", key="ban_prev", on_click=move_page, args=(-1,))
+        bc2.button("NEXT ▶", key="ban_next", on_click=move_page, args=(1,))
+        st.markdown('</div>', unsafe_allow_html=True)
+
         st.image(st.session_state.sheets[st.session_state.page], use_container_width=True)
-        st.caption(f"현재 페이지: {st.session_state.page + 1} / {len(st.session_state.sheets)}")
     else:
-        st.info("인도자가 악보를 업로드할 때까지 기다려 주세요.")
+        st.info("인도자가 악보를 올릴 때까지 대기 중...")
+
