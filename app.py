@@ -1,43 +1,54 @@
 import streamlit as st
 
-# 1. 앱 제목과 아이콘 설정
-st.set_page_config(page_title="대흥교회 찬양팀", page_icon="🎵")
-st.title("🎵 대흥교회 찬양팀 스마트 보드")
+# 앱 설정
+st.set_page_config(page_title="대흥교회 실시간 소통판", layout="wide")
 
-# 사이드바 설정
-user_type = st.sidebar.radio("내 역할", ["인도자", "반주자/싱어"])
+# 가짜 데이터베이스 (버튼 누른 상태 저장)
+if 'message' not in st.session_state:
+    st.session_state.message = "현재 대기 중..."
 
-if user_type == "인도자":
-    st.header("🎮 인도자 컨트롤 패널")
+st.title("🎵 실시간 찬양팀 소통 시스템")
+
+# 사이드바 역할 선택
+user_role = st.sidebar.radio("역할", ["인도자", "반주자/싱어"])
+
+if user_role == "인도자":
+    st.header("🎮 인도자 전용 버튼 (한 번만 클릭!)")
     
-    # 기능 1: 곡 순서 적기 (자유롭게 수정 가능!)
-    st.subheader("📝 오늘 찬양 순서")
-    st.text_area("곡 목록", "1. 은혜로다\n2. 주 이름 찬양\n3. 꽃들도")
+    # 가사 및 구간 이동 버튼들
+    col1, col2, col3 = st.columns(3)
     
-    # 기능 2: 색깔 신호 버튼 (상태별로 색이 달라!)
-    st.subheader("📢 실시간 신호")
-    col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔄 후렴 반복", use_container_width=True):
-            st.success("반주자에게 '후렴 반복' 전달!")
+        if st.button("𝄇 후렴 다시", use_container_width=True):
+            st.session_state.message = "🔄 후렴구부터 다시 시작하세요!"
+        if st.button("🎙️ 가사 처음부터", use_container_width=True):
+            st.session_state.message = "⏮️ 처음 가사로 돌아갑니다!"
+            
     with col2:
-        if st.button("🛑 즉시 멈춤", use_container_width=True):
-            st.error("반주자에게 '멈춤' 신호 전달!")
+        if st.button("🌉 브릿지로", use_container_width=True):
+            st.session_state.message = "🌉 브릿지(Bridge) 파트 진입!"
+        if st.button("🎹 전주/간주", use_container_width=True):
+            st.session_state.message = "🎼 악기 연주 중 (전주/간주)"
 
-    # 기능 3: 직접 메시지 쓰기 (전달하고 싶은 말을 직접 입력)
-    st.subheader("💬 긴급 메시지")
-    msg = st.text_input("전달할 내용 입력 (예: 한 키 올려주세요)")
-    if st.button("메시지 보내기"):
-        st.write(f"보낸 메시지: {msg}")
+    with col3:
+        if st.button("🔚 엔딩 준비", use_container_width=True):
+            st.session_state.message = "🔚 마지막 절 하고 마무리!"
+        if st.button("🛑 즉시 멈춤", type="primary", use_container_width=True):
+            st.session_state.message = "🛑 즉시 연주를 멈춰주세요!"
+
+    st.divider()
+    st.subheader("현재 전달된 신호:")
+    st.warning(st.session_state.message)
 
 else:
     st.header("🎹 반주자/싱어 모니터")
-    st.info("인도자의 신호를 기다리고 있습니다...")
+    # 신호를 아주 크게 보여줌
+    st.markdown(f"""
+        <div style="background-color:#f0f2f6; padding:50px; border-radius:10px; text-align:center;">
+            <h1 style="color:#ff4b4b; font-size:60px;">{st.session_state.message}</h1>
+        </div>
+    """, unsafe_allow_html=True)
     
-    # 기능 4: 템포 체크 (슬라이더로 박자 맞추기)
-    st.subheader("⏱️ 박자 가이드")
-    st.slider("템포(BPM) 조절", 60, 180, 100)
-    
-    # 기능 5: 하단 응원 메시지
-    st.divider()
-    st.caption("오늘도 기쁨으로 찬양합시다! 화이팅! 💪")
+    if st.button("알림 확인 완료"):
+        st.session_state.message = "대기 중..."
+      
